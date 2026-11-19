@@ -1,0 +1,27 @@
+[package]
+name = "rust-template"
+version = "0.1.0" # the release tag's version: rust-template/v0.1.0
+edition = "2024"
+publish = false
+
+# The library is `app` in every app, as the Python package and the Java package are, so a
+# renamed app changes only the package and binary name.
+[lib]
+name = "app"
+
+[dependencies]
+axum = "0.8.9"
+prometheus-client = "0.26.0"
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tokio = { version = "1.54.1", features = ["io-util"] }
+tower = { version = "0.5.3", features = ["util"] }
+
+[profile.release]
+# A smaller binary and image; a panic still unwinds and is logged.
+lto = true
+codegen-units = 1
+strip = true

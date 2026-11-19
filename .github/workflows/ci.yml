@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege: the default GITHUB_TOKEN can write to the repo; CI only needs to read.
+permissions:
+  contents: read
+
+# A new push to the same PR/branch cancels the now-stale run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Docs-only PRs skip the work in every job (scripts/ci-scope.sh).
+  scope:
+    name: change scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2 # the PR merge commit and its first parent
+      - name: Does this change need the checks?
+        id: scope
+        run: scripts/ci-scope.sh
+
+  # The platform's reusable workflows, pinned to platform.lock's commit (a test keeps them
+  # equal; Renovate moves them together).
+  check:
+    needs: scope
+    uses: easypeasyops/platform/.github/workflows/reusable-python-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+    with:
+      run: ${{ needs.scope.outputs.full == 'true' }}
+      working-directory: apps/python-template
+      typecheck-paths: app tests
+
+  image:
+    needs: scope
+    uses: easypeasyops/platform/.github/workflows/reusable-image.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+    with:
+      run: ${{ needs.scope.outputs.full == 'true' }}
+      context: apps/python-template
+      smoke-command: apps/python-template/scripts/smoke.sh # reads $IMAGE
+
+  java-check:
+    needs: scope
+    uses: easypeasyops/platform/.github/workflows/reusable-java-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+    with:
+      run: ${{ needs.scope.outputs.full == 'true' }}
+      working-directory: apps/java-template
+
+  java-image:
+    needs: scope
+    uses: easypeasyops/platform/.github/workflows/reusable-image.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+    with:
+      run: ${{ needs.scope.outputs.full == 'true' }}
+      context: apps/java-template
+      smoke-command: apps/java-template/scripts/smoke.sh # reads $IMAGE
+
+  rust-check:
+    needs: scope
+    uses: easypeasyops/platform/.github/workflows/reusable-rust-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+    with:
+      run: ${{ needs.scope.outputs.full == 'true' }}
+      working-directory: apps/rust-template
+
+  rust-image:
+    needs: scope
+    uses: easypeasyops/platform/.github/workflows/reusable-image.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+    with:
+      run: ${{ needs.scope.outputs.full == 'true' }}
+      context: apps/rust-template
+      smoke-command: apps/rust-template/scripts/smoke.sh # reads $IMAGE
+
+  # Each app's deploy values (apps/<app>/deploy/), rendered for each environment with the
+  # platform's service chart as Argo CD will, and schema-checked. CHART is the latest service
+  # chart release: Renovate moves it (.github/renovate.json5), keep version and digest together.
+  deploy:
+    name: deploy values
+    needs: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CHART: oci://ghcr.io/easypeasyops/charts/service@sha256:11a7ca25f34cd7a16bf2fbd4a5ad86e3bbc556f19f9ab236e1c2b05f50fb6a7f # 1.7.1
+      CRDS: https://raw.githubusercontent.com/datreeio/CRDs-catalog/501527ab9c40c827144c8f45945b25a023e344ce
+      KUBECONFORM: ghcr.io/yannh/kubeconform:v0.8.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.scope.outputs.full == 'true'
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        if: needs.scope.outputs.full == 'true'
+        with:
+          version: v4.3.1
+      # The SLO rules are generated (deploy/prometheus/slos.yaml): the committed file must
+      # be what the platform's generator, at platform.lock's commit, writes from the spec.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.scope.outputs.full == 'true'
+        with:
+          repository: easypeasyops/platform
+          ref: 09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
+          path: platform
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: needs.scope.outputs.full == 'true'
+        with:
+          enable-cache: false
+      - name: SLO rules match their spec
+        if: needs.scope.outputs.full == 'true'
+        working-directory: apps
+        run: |
+          for spec in */deploy/prometheus/slos.yaml; do
+            (cd "${spec%%/*}" && uv run --script ../../platform/scripts/gen_slo_rules.py --check \
+              --spec deploy/prometheus/slos.yaml \
+              --values --out deploy/service/slo-rules.values.yaml)
+          done
+      - name: Render each environment and validate it
+        if: needs.scope.outputs.full == 'true'
+        working-directory: apps
+        run: |
+          # An env file without a release yet renders with a placeholder digest.
+          placeholder="sha256:$(printf '0%.0s' {1..64})"
+          mkdir -p /tmp/rendered
+          for env_file in */deploy/envs/*.yaml; do
+            app=${env_file%%/*} env=$(basename "$env_file" .yaml)
+            digest=$(yq -r '.image.digest // ""' "$env_file")
+            # Prod ships the SLO rules, as the platform's apps/<app>/envs/prod.yaml layers them.
+            slo=()
+            if [[ "$env" == prod && -f "$app/deploy/service/slo-rules.values.yaml" ]]; then
+              slo=(--values "$app/deploy/service/slo-rules.values.yaml")
+            fi
+            helm template "$app" "$CHART" --namespace "$app-$env" \
+              --values "$app/deploy/service/values.yaml" "${slo[@]}" --values "$env_file" \
+              --set "image.digest=${digest:-$placeholder}" \
+              --kube-version 1.37.0 \
+              --api-versions monitoring.coreos.com/v1/ServiceMonitor \
+              --api-versions monitoring.coreos.com/v1/PodMonitor \
+              --api-versions monitoring.coreos.com/v1/PrometheusRule >"/tmp/rendered/$app-$env.yaml"
+            echo "$app $env: $(grep -c '^kind:' "/tmp/rendered/$app-$env.yaml") objects"
+          done
+          docker run --rm -v /tmp/rendered:/r:ro -w /r "$KUBECONFORM" -strict -summary \
+            -kubernetes-version 1.37.0 -schema-location default \
+            -schema-location "$CRDS/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" \
+            .
+
+  # The one required check: green only when every job above passed (or was skipped as
+  # docs-only by its own input, which still reports success).
+  gate:
+    name: ci
+    if: always()
+    needs: [scope, check, image, java-check, java-image, rust-check, rust-image, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<<"$NEEDS" >/dev/null

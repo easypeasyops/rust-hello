@@ -1,0 +1,10 @@
+# Never in the image: secrets, build output, tests, local tooling.
+.env
+.env.*
+target/
+tests/
+deploy/
+scripts/
+.idea/
+.vscode/
+.DS_Store

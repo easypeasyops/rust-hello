@@ -1,0 +1,6 @@
+# The compiler CI (the platform's reusable-rust-check.yml), the Dockerfile and a laptop
+# build with. Keep the Dockerfile's rust image on the same release.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt", "llvm-tools"]
+profile = "minimal"

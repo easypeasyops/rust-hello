@@ -1,0 +1,63 @@
+// Renovate moves the platform pin, which Dependabot can't (dependabot.yaml has the rest):
+// the commit in platform.lock, the reusable workflows' SHAs in ci.yml and the platform
+// checkout in its deploy job are one dependency, so they move in one PR, weekly, to the
+// platform's main. CI on that PR is the proof this app works on the new platform commit.
+//
+// The service chart CI renders the deploy values with (CHART: in ci.yml) follows the chart's
+// releases on GHCR, version and digest together, checked whenever Renovate runs. A minor or
+// patch auto-merges once CI is green; a major opens no PR until a person ticks it on the
+// Dependency Dashboard, since the app's values may have to change with it.
+//
+// Only these regex managers run: the pinned GitHub Actions keep one bumper (Dependabot).
+// Needs the Renovate GitHub App installed on the repo.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended", "schedule:weekly"],
+  enabledManagers: ["custom.regex"],
+  // Renovate merges its own PRs once every check on them is green, instead of turning on
+  // GitHub's auto-merge: with no required check on main, GitHub would merge at once, before
+  // CI has run. A repo made from this one that requires `ci` (README, step 3) can drop this.
+  platformAutomerge: false,
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^platform\\.lock$/", "/^\\.github/workflows/ci\\.yml$/"],
+      matchStrings: [
+        "easypeasyops/platform(?:/\\.github/workflows/[\\w.-]+)?@(?<currentDigest>[a-f0-9]{40})",
+        "ref: (?<currentDigest>[a-f0-9]{40}) # platform\\.lock",
+      ],
+      depNameTemplate: "easypeasyops/platform",
+      packageNameTemplate: "https://github.com/easypeasyops/platform",
+      datasourceTemplate: "git-refs",
+      currentValueTemplate: "main",
+    },
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/workflows/ci\\.yml$/"],
+      matchStrings: [
+        "CHART: oci://(?<depName>ghcr\\.io/easypeasyops/charts/service)@(?<currentDigest>sha256:[a-f0-9]{64}) # (?<currentValue>\\S+)",
+      ],
+      datasourceTemplate: "docker",
+      versioningTemplate: "semver", // skips the sha256-… attestation tags
+    },
+  ],
+  packageRules: [
+    {
+      matchDepNames: ["ghcr.io/easypeasyops/charts/service"],
+      schedule: ["at any time"],
+      commitMessageTopic: "service chart",
+      automerge: true,
+      automergeStrategy: "squash",
+    },
+    {
+      matchDepNames: ["ghcr.io/easypeasyops/charts/service"],
+      matchUpdateTypes: ["major"],
+      automerge: false,
+    },
+    {
+      // A major opens no PR until a person ticks it on the Dependency Dashboard.
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+    },
+  ],
+}
