@@ -2,27 +2,6 @@
 # (including the image scan and smoke test) decides whether they're safe to merge.
 version: 2
 updates:
-  - package-ecosystem: uv
-    directories: [/apps/python-template]
-    schedule:
-      interval: weekly
-    groups:
-      # Minor and patch updates together, one PR a week; a major update arrives in a PR of
-      # its own, because it can break the code.
-      python-deps:
-        patterns: ["*"]
-        update-types: [minor, patch]
-
-  # Spring Boot's parent pins most versions: a Boot bump moves them together.
-  - package-ecosystem: maven
-    directories: [/apps/java-template]
-    schedule:
-      interval: weekly
-    groups:
-      java-deps:
-        patterns: ["*"]
-        update-types: [minor, patch]
-
   - package-ecosystem: cargo
     directories: [/apps/rust-template]
     schedule:

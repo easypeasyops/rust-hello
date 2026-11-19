@@ -33,37 +33,6 @@ jobs:
 
   # The platform's reusable workflows, pinned to platform.lock's commit (a test keeps them
   # equal; Renovate moves them together).
-  check:
-    needs: scope
-    uses: easypeasyops/platform/.github/workflows/reusable-python-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
-    with:
-      run: ${{ needs.scope.outputs.full == 'true' }}
-      working-directory: apps/python-template
-      typecheck-paths: app tests
-
-  image:
-    needs: scope
-    uses: easypeasyops/platform/.github/workflows/reusable-image.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
-    with:
-      run: ${{ needs.scope.outputs.full == 'true' }}
-      context: apps/python-template
-      smoke-command: apps/python-template/scripts/smoke.sh # reads $IMAGE
-
-  java-check:
-    needs: scope
-    uses: easypeasyops/platform/.github/workflows/reusable-java-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
-    with:
-      run: ${{ needs.scope.outputs.full == 'true' }}
-      working-directory: apps/java-template
-
-  java-image:
-    needs: scope
-    uses: easypeasyops/platform/.github/workflows/reusable-image.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
-    with:
-      run: ${{ needs.scope.outputs.full == 'true' }}
-      context: apps/java-template
-      smoke-command: apps/java-template/scripts/smoke.sh # reads $IMAGE
-
   rust-check:
     needs: scope
     uses: easypeasyops/platform/.github/workflows/reusable-rust-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
@@ -156,7 +125,7 @@ jobs:
   gate:
     name: ci
     if: always()
-    needs: [scope, check, image, java-check, java-image, rust-check, rust-image, deploy]
+    needs: [scope, rust-check, rust-image, deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
