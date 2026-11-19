@@ -3,6 +3,6 @@
 # deploy. The digest is in the release's notes.
 environment: staging
 image:
-  digest: "" # no release deployed yet
+  digest: sha256:5e0e3d4ecc8f11ca835f22bf932d13dc025187c8fea0c3beb077ff8874e8e526 # rust-hello/v0.1.0
 gateway:
   hostnames: ["staging.rust-hello.localhost"]
