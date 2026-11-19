@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw --batch-mode --no-transfer-progre
 
 # ---------------------------------------------------------------------------- runtime
 # Distroless: a JRE and nothing else (no shell, no package manager), so little to scan.
-FROM gcr.io/distroless/java21-debian13:nonroot@sha256:6b60e44d652d66a9e2e584364c96adac4df7133674b2834b6f71741b7cdb1ff3 AS runtime
+FROM gcr.io/distroless/java21-debian13:nonroot@sha256:e331c420616bf4771ac477c1c5b6cfc92de3d07a7d59bb15235bf2a7955ae881 AS runtime
 
 WORKDIR /app
 # Owned by root and only readable by the app: a compromised process can't rewrite it.
