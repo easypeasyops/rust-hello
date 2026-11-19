@@ -1,7 +1,7 @@
 # Prod, namespace rust-hello-prod. Promote a release by setting the digest staging runs.
 environment: prod
 image:
-  digest: "" # no release deployed yet
+  digest: sha256:5e0e3d4ecc8f11ca835f22bf932d13dc025187c8fea0c3beb077ff8874e8e526 # rust-hello/v0.1.0, as staging
 replicaCount: 2 # survives one pod loss or a node drain (the chart adds a PodDisruptionBudget)
 gateway:
   hostnames: ["rust-hello.localhost"]
