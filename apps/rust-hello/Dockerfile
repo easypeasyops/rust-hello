@@ -39,13 +39,13 @@ COPY src src
 # The registry and target/ are cache mounts: a rebuild compiles only what changed. Tests,
 # formatting, lints and coverage are CI's check job (reusable-rust-check.yml), not the image's.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target,id=rust-template-target-$TARGETARCH \
+    --mount=type=cache,target=/src/target,id=rust-hello-target-$TARGETARCH \
     target=$(cat /target) \
  && if [ "$TARGETARCH" = "$BUILDARCH" ]; then \
       unset CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER; \
     fi \
  && cargo build --release --locked --target "$target" \
- && cp "target/$target/release/rust-template" /rust-template
+ && cp "target/$target/release/rust-hello" /rust-hello
 
 # ---------------------------------------------------------------------------- runtime
 # Distroless cc: glibc and libgcc, nothing else (no shell, no package manager), so little to
@@ -53,10 +53,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM gcr.io/distroless/cc-debian13:nonroot@sha256:cb87acc574abe719b6e5c547384defa2f7b1f24af9605d3f618cf852495d8be2 AS runtime
 
 # Owned by root and only executable by the app: a compromised process can't rewrite it.
-COPY --from=builder /rust-template /usr/local/bin/rust-template
+COPY --from=builder /rust-hello /usr/local/bin/rust-hello
 
 # Fixed, non-root UID/GID: predictable file ownership and Kubernetes `runAsNonRoot`.
 USER 10001:10001
 EXPOSE 8000 9100
 
-ENTRYPOINT ["/usr/local/bin/rust-template"]
+ENTRYPOINT ["/usr/local/bin/rust-hello"]

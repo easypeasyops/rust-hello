@@ -1,6 +1,6 @@
 [package]
-name = "rust-template"
-version = "0.1.0" # the release tag's version: rust-template/v0.1.0
+name = "rust-hello"
+version = "0.1.0" # the release tag's version: rust-hello/v0.1.0
 edition = "2024"
 publish = false
 

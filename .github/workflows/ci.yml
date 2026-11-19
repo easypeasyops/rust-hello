@@ -38,15 +38,15 @@ jobs:
     uses: easypeasyops/platform/.github/workflows/reusable-rust-check.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
     with:
       run: ${{ needs.scope.outputs.full == 'true' }}
-      working-directory: apps/rust-template
+      working-directory: apps/rust-hello
 
   rust-image:
     needs: scope
     uses: easypeasyops/platform/.github/workflows/reusable-image.yml@09bba2af880d8f2d21ed10bd7bcf62d0784bb30d # platform.lock
     with:
       run: ${{ needs.scope.outputs.full == 'true' }}
-      context: apps/rust-template
-      smoke-command: apps/rust-template/scripts/smoke.sh # reads $IMAGE
+      context: apps/rust-hello
+      smoke-command: apps/rust-hello/scripts/smoke.sh # reads $IMAGE
 
   # Each app's deploy values (apps/<app>/deploy/), rendered for each environment with the
   # platform's service chart as Argo CD will, and schema-checked. CHART is the latest service

@@ -3,11 +3,11 @@
 # it: as UID 10001 on a read-only root filesystem. It answers the probes, serves metrics on
 # their own port and stops cleanly on SIGTERM.
 #
-#   IMAGE=rust-template:dev scripts/smoke.sh
+#   IMAGE=rust-hello:dev scripts/smoke.sh
 set -euo pipefail
 
-IMAGE="${IMAGE:-rust-template:dev}"
-NAME="rust-template-smoke-$$"
+IMAGE="${IMAGE:-rust-hello:dev}"
+NAME="rust-hello-smoke-$$"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok   $*"; }
 cleanup() {
